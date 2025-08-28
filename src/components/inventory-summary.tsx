@@ -64,7 +64,7 @@ export default function InventorySummary({ items, setItems }: InventorySummaryPr
     <Card className="w-full shadow-lg border-2 border-primary/20">
       <CardHeader>
         <CardTitle>Inventory Summary</CardTitle>
-        <CardDescription>A summary of your saved items.</CardDescription>
+        <CardDescription>A summary of your saved items. All values are in USD.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
