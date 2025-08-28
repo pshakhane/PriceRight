@@ -12,7 +12,8 @@ import {
   Ship,
   Landmark,
   TrendingUp,
-  Info
+  Info,
+  Text,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const LOCAL_STORAGE_KEY = 'priceRightCalculatorState';
 
 const formSchema = z.object({
+  itemName: z.string().default(''),
   baseCost: z.coerce.number().min(0).default(0),
   packaging: z.coerce.number().min(0).default(0),
   localShipping: z.coerce.number().min(0).default(0),
@@ -44,6 +46,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const initialValues: FormValues = {
+  itemName: '',
   baseCost: 100,
   packaging: 5,
   localShipping: 10,
@@ -52,7 +55,7 @@ const initialValues: FormValues = {
   profitMargin: 25,
 };
 
-const InputField = ({ name, label, icon: Icon, control, tooltip }: { name: keyof FormValues, label: string, icon: React.ElementType, control: any, tooltip: string }) => (
+const InputField = ({ name, label, icon: Icon, control, tooltip, type = "number" }: { name: keyof FormValues, label: string, icon: React.ElementType, control: any, tooltip: string, type?: string }) => (
     <div className="space-y-2">
         <div className="flex items-center gap-2">
             <Label htmlFor={name}>{label}</Label>
@@ -76,11 +79,17 @@ const InputField = ({ name, label, icon: Icon, control, tooltip }: { name: keyof
                     <Input
                         {...field}
                         id={name}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
+                        type={type}
+                        step={type === 'number' ? '0.01' : undefined}
+                        placeholder={type === 'number' ? '0.00' : 'Enter value'}
                         className="pl-10"
-                        onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                        onChange={e => {
+                            if (type === 'number') {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                            } else {
+                                field.onChange(e.target.value);
+                            }
+                        }}
                     />
                 )}
             />
@@ -145,6 +154,9 @@ export default function PriceCalculator() {
       </CardHeader>
       <CardContent>
         <form className="space-y-6">
+           <div className="mb-6">
+                <InputField name="itemName" label="Item Name" icon={Text} control={control} tooltip="The name of the item you are selling." type="text" />
+            </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputField name="baseCost" label="Base Item Cost" icon={Coins} control={control} tooltip="The original cost of the item from the supplier." />
             <InputField name="packaging" label="Packaging Cost" icon={Package} control={control} tooltip="Cost of boxes, wrap, and other packaging materials." />
