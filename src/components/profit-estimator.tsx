@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { ArrowRight, Bot, Loader2 } from 'lucide-react';
 import { getProfitMarginSuggestion, ActionState } from '@/app/actions';
 
@@ -51,7 +51,7 @@ function SubmitButton() {
 
 export default function ProfitEstimator({ onApplySuggestion }: ProfitEstimatorProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(getProfitMarginSuggestion, initialState);
+  const [state, formAction] = useActionState(getProfitMarginSuggestion, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
