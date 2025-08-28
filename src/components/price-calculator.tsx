@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Info,
   Text,
+  Save,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,11 +31,13 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import ProfitEstimator from './profit-estimator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import InventorySummary, { type InventoryItem } from './inventory-summary';
 
-const LOCAL_STORAGE_KEY = 'priceRightCalculatorState';
+const LOCAL_STORAGE_KEY_CALCULATOR = 'priceRightCalculatorState';
+const LOCAL_STORAGE_KEY_INVENTORY = 'priceRightInventoryState';
 
 const formSchema = z.object({
-  itemName: z.string().default(''),
+  itemName: z.string().min(1, 'Item name is required.').default(''),
   baseCost: z.coerce.number().min(0).default(0),
   packaging: z.coerce.number().min(0).default(0),
   localShipping: z.coerce.number().min(0).default(0),
@@ -55,7 +58,7 @@ const initialValues: FormValues = {
   profitMargin: 25,
 };
 
-const InputField = ({ name, label, icon: Icon, control, tooltip, type = "number" }: { name: keyof FormValues, label: string, icon: React.ElementType, control: any, tooltip: string, type?: string }) => (
+const InputField = ({ name, label, icon: Icon, control, tooltip, type = "number", error }: { name: keyof FormValues, label: string, icon: React.ElementType, control: any, tooltip: string, type?: string, error?: string }) => (
     <div className="space-y-2">
         <div className="flex items-center gap-2">
             <Label htmlFor={name}>{label}</Label>
@@ -94,36 +97,54 @@ const InputField = ({ name, label, icon: Icon, control, tooltip, type = "number"
                 )}
             />
         </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
 );
 
 export default function PriceCalculator() {
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialValues,
   });
 
-  const { control, watch, setValue, reset } = form;
+  const { control, watch, setValue, reset, trigger, getValues, formState: { errors } } = form;
 
   useEffect(() => {
-    const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedState) {
+    const savedCalculatorState = localStorage.getItem(LOCAL_STORAGE_KEY_CALCULATOR);
+    if (savedCalculatorState) {
       try {
-        const parsedState = JSON.parse(savedState);
+        const parsedState = JSON.parse(savedCalculatorState);
         reset(formSchema.parse(parsedState));
       } catch (e) {
-        console.error("Failed to parse saved state:", e);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        console.error("Failed to parse saved calculator state:", e);
+        localStorage.removeItem(LOCAL_STORAGE_KEY_CALCULATOR);
       }
+    }
+
+    const savedInventoryState = localStorage.getItem(LOCAL_STORAGE_KEY_INVENTORY);
+    if (savedInventoryState) {
+        try {
+            const parsedState = JSON.parse(savedInventoryState);
+            setInventory(parsedState);
+        } catch(e) {
+            console.error("Failed to parse saved inventory state:", e);
+            localStorage.removeItem(LOCAL_STORAGE_KEY_INVENTORY);
+        }
     }
   }, [reset]);
 
   useEffect(() => {
     const subscription = watch((value) => {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(value));
+      localStorage.setItem(LOCAL_STORAGE_KEY_CALCULATOR, JSON.stringify(value));
     });
     return () => subscription.unsubscribe();
   }, [watch]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY_INVENTORY, JSON.stringify(inventory));
+  }, [inventory]);
 
   const watchedValues = watch();
 
@@ -141,55 +162,77 @@ export default function PriceCalculator() {
   
   const handleReset = () => {
     reset(initialValues);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_KEY_CALCULATOR);
   };
+  
+  const handleSaveItem = async () => {
+    const isValid = await trigger();
+    if (isValid) {
+        const values = getValues();
+        const newItem: InventoryItem = {
+            id: Date.now(),
+            name: values.itemName,
+            totalCost,
+            profitAmount,
+            finalPrice,
+        };
+        setInventory(prev => [...prev, newItem]);
+        reset(initialValues);
+    }
+  }
 
   return (
-    <Card className="w-full shadow-lg border-2 border-primary/20">
-      <CardHeader>
-        <CardTitle>Price Calculator</CardTitle>
-        <CardDescription>
-          Enter your costs and desired profit margin to determine the final selling price.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-6">
-           <div className="mb-6">
-                <InputField name="itemName" label="Item Name" icon={Text} control={control} tooltip="The name of the item you are selling." type="text" />
+    <>
+      <Card className="w-full shadow-lg border-2 border-primary/20">
+        <CardHeader>
+          <CardTitle>Price Calculator</CardTitle>
+          <CardDescription>
+            Enter your costs and desired profit margin to determine the final selling price.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-6">
+             <div className="mb-6">
+                  <InputField name="itemName" label="Item Name" icon={Text} control={control} tooltip="The name of the item you are selling." type="text" error={errors.itemName?.message} />
+              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputField name="baseCost" label="Base Item Cost" icon={Coins} control={control} tooltip="The original cost of the item from the supplier." />
+              <InputField name="packaging" label="Packaging Cost" icon={Package} control={control} tooltip="Cost of boxes, wrap, and other packaging materials." />
+              <InputField name="localShipping" label="Local Shipping" icon={Truck} control={control} tooltip="Cost to ship the item to a local port or warehouse." />
+              <InputField name="overseasShipment" label="Overseas Shipment" icon={Ship} control={control} tooltip="Cost of international freight and shipping." />
+              <InputField name="customs" label="Customs & Duties" icon={Landmark} control={control} tooltip="Taxes and fees for importing the item." />
+              <InputField name="profitMargin" label="Desired Profit Margin (%)" icon={TrendingUp} control={control} tooltip="The percentage of profit you want to make on top of the total cost." />
             </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField name="baseCost" label="Base Item Cost" icon={Coins} control={control} tooltip="The original cost of the item from the supplier." />
-            <InputField name="packaging" label="Packaging Cost" icon={Package} control={control} tooltip="Cost of boxes, wrap, and other packaging materials." />
-            <InputField name="localShipping" label="Local Shipping" icon={Truck} control={control} tooltip="Cost to ship the item to a local port or warehouse." />
-            <InputField name="overseasShipment" label="Overseas Shipment" icon={Ship} control={control} tooltip="Cost of international freight and shipping." />
-            <InputField name="customs" label="Customs & Duties" icon={Landmark} control={control} tooltip="Taxes and fees for importing the item." />
-            <InputField name="profitMargin" label="Desired Profit Margin (%)" icon={TrendingUp} control={control} tooltip="The percentage of profit you want to make on top of the total cost." />
-          </div>
-        </form>
-      </CardContent>
-      <Separator className="my-4" />
-      <CardFooter className="flex flex-col items-start gap-6">
-         <div className="w-full space-y-4">
-            <div className="flex justify-between items-center text-md">
-                <span className="text-muted-foreground">Total Cost:</span>
-                <span className="font-medium">{totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
-            </div>
-             <div className="flex justify-between items-center text-md">
-                <span className="text-muted-foreground">Profit Amount:</span>
-                <span className="font-medium">{profitAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
-            </div>
-             <div className="flex justify-between items-center text-2xl font-bold text-accent">
-                <span>Final Selling Price:</span>
-                <span>{finalPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
-            </div>
-         </div>
-         <div className="w-full flex flex-col sm:flex-row gap-2">
-            <ProfitEstimator onApplySuggestion={handleApplySuggestion} />
-            <Button variant="ghost" onClick={handleReset} className="flex-grow border border-input">
-                Reset Values
-            </Button>
-         </div>
-      </CardFooter>
-    </Card>
+          </form>
+        </CardContent>
+        <Separator className="my-4" />
+        <CardFooter className="flex flex-col items-start gap-6">
+           <div className="w-full space-y-4">
+              <div className="flex justify-between items-center text-md">
+                  <span className="text-muted-foreground">Total Cost:</span>
+                  <span className="font-medium">{totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+              </div>
+               <div className="flex justify-between items-center text-md">
+                  <span className="text-muted-foreground">Profit Amount:</span>
+                  <span className="font-medium">{profitAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+              </div>
+               <div className="flex justify-between items-center text-2xl font-bold text-accent">
+                  <span>Final Selling Price:</span>
+                  <span>{finalPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+              </div>
+           </div>
+           <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <ProfitEstimator onApplySuggestion={handleApplySuggestion} />
+              <Button variant="outline" onClick={handleSaveItem} className="w-full">
+                  <Save className="mr-2 h-4 w-4" /> Save Item
+              </Button>
+              <Button variant="ghost" onClick={handleReset} className="w-full border border-input">
+                  Reset Values
+              </Button>
+           </div>
+        </CardFooter>
+      </Card>
+      {inventory.length > 0 && <InventorySummary items={inventory} setItems={setInventory} />}
+    </>
   );
 }
