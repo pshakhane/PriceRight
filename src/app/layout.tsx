@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 export const metadata: Metadata = {
   title: 'PriceRight',
   description: 'Calculate the final selling price of your items with ease.',
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({
