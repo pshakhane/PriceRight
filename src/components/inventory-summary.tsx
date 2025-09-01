@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useTransition } from 'react';
 import {
   Card,
   CardContent,
@@ -20,7 +20,10 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Button } from './ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CreditCard, Loader2 } from 'lucide-react';
+import { createCheckoutSession } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
+
 
 export interface InventoryItem {
   id: number;
@@ -40,6 +43,9 @@ const formatCurrency = (amount: number) => {
 }
 
 export default function InventorySummary({ items, setItems }: InventorySummaryProps) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
   const summary = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -59,6 +65,33 @@ export default function InventorySummary({ items, setItems }: InventorySummaryPr
   const handleClearAll = () => {
     setItems([]);
   }
+  
+  const handleCheckout = () => {
+    if (items.length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Your inventory is empty.',
+            description: 'Add some items before checking out.',
+        });
+        return;
+    }
+    startTransition(async () => {
+        try {
+            await createCheckoutSession(items);
+        } catch (error) {
+            console.error('Stripe checkout error:', error);
+            let errorMessage = 'Could not initiate checkout. Please try again.';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            toast({
+                variant: 'destructive',
+                title: 'Checkout Error',
+                description: errorMessage,
+            });
+        }
+    });
+  };
 
   return (
     <Card className="w-full shadow-lg border-2 border-primary/20">
@@ -103,8 +136,20 @@ export default function InventorySummary({ items, setItems }: InventorySummaryPr
           </TableFooter>
         </Table>
       </CardContent>
-       <CardFooter>
+       <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <Button variant="destructive" onClick={handleClearAll} size="sm">Clear All Items</Button>
+        <Button onClick={handleCheckout} disabled={isPending} className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
+             {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                <>
+                  Checkout with Stripe <CreditCard className="ml-2 h-4 w-4" />
+                </>
+              )}
+        </Button>
       </CardFooter>
     </Card>
   );
