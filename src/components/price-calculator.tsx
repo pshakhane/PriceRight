@@ -72,6 +72,8 @@ const currencies = [
   { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
   { code: 'GBP', name: 'British Pound Sterling', symbol: '£' },
   { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: '$' },
+  { code: 'SLL', name: 'Sierra Leonean', symbol: 'LE' },
 ];
 
 const exchangeRates: { [key: string]: number } = {
@@ -80,6 +82,8 @@ const exchangeRates: { [key: string]: number } = {
   JPY: 157,
   GBP: 0.79,
   CAD: 1.37,
+  AUD: 1.52,
+  SLL: 22500
 };
 
 const InputField = ({ name, label, icon: Icon, control, tooltip, type = "number", error }: { name: keyof FormValues, label: string, icon: React.ElementType, control: any, tooltip: string, type?: string, error?: string }) => (
